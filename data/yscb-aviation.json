@@ -1,0 +1,112 @@
+{
+  "airport": "YSCB",
+  "airportName": "Canberra Airport",
+  "effectiveFrom": "2026-09-03",
+  "effectiveTo": "2026-11-25",
+  "runway35": {
+    "threshold": {
+      "lat": -35.314808333,
+      "lon": 149.194444444,
+      "elevationFtAmsl": 1869
+    },
+    "farEnd": {
+      "lat": -35.290627778,
+      "lon": 149.194441667
+    },
+    "trueBearingDeg": 359.994603498,
+    "ldaM": 2683,
+    "widthM": 45,
+    "measuredThresholdToFarEndM": 2682.739,
+    "outline": [
+      [
+        149.194197021,
+        -35.314808352
+      ],
+      [
+        149.194194317,
+        -35.290627797
+      ],
+      [
+        149.194689017,
+        -35.290627758
+      ],
+      [
+        149.194691868,
+        -35.314808314
+      ]
+    ],
+    "touchdownZone": {
+      "lengthM": 900,
+      "definition": "RWY 35 precision-approach touchdown zone, threshold to 900 m",
+      "outline": [
+        [
+          149.194197021,
+          -35.314808352
+        ],
+        [
+          149.194196113,
+          -35.306696318
+        ],
+        [
+          149.194690911,
+          -35.30669628
+        ],
+        [
+          149.194691868,
+          -35.314808314
+        ]
+      ]
+    }
+  },
+  "glidepath": {
+    "angleDeg": 3,
+    "rdhFt": 50,
+    "magneticTrackDeg": 348,
+    "nominalGroundIntercept": {
+      "lat": -35.312187277,
+      "lon": 149.194444143,
+      "distanceDownRunwayFromThresholdM": 290.7965
+    },
+    "approachEnd": {
+      "lat": -35.402320297,
+      "lon": 149.194454512
+    },
+    "rangeM": 10000,
+    "beamFullWidthDeg": 1.4,
+    "beamHalfWidthDeg": 0.7,
+    "visualWidthM": 45,
+    "corridorNote": "Vertical bounds use the standard 1.4 degree ILS glide-path beam width; lateral visual width equals RWY 17/35 width and is not a localizer tolerance."
+  },
+  "sources": [
+    {
+      "authority": "Australian Communications and Media Authority",
+      "title": "RALI MS47 — identified runway coordinates, May 2026 update",
+      "role": "WGS84 RWY 35 landing-end and far-end coordinates",
+      "url": "https://www.acma.gov.au/sites/default/files/2026-05/RALI%20MS47%20-%20Frequency%20coordination%20and%20licensing%20procedures%20for%20AWLs%20in%20the%203400%E2%80%934000%20MHz%20band%20%28May%202026%20update%29.pdf"
+    },
+    {
+      "authority": "Airservices Australia",
+      "title": "YSCB Aerodrome Chart SCBAD01-188",
+      "role": "RWY width 45 m, RWY 35 LDA 2683 m, THR elevation 1869 ft",
+      "url": "https://www.airservicesaustralia.com/aip/pending/dap/SCBAD01-188_03SEP2026.pdf"
+    },
+    {
+      "authority": "Airservices Australia",
+      "title": "YSCB ILS-Z or LOC-Z RWY 35 SCBII01-186",
+      "role": "3 degree glidepath, RDH 50 ft, magnetic track 348 degrees",
+      "url": "https://www.airservicesaustralia.com/aip/pending/dap/SCBII01-186_03SEP2026.pdf"
+    },
+    {
+      "authority": "Civil Aviation Safety Authority / Australian Government",
+      "title": "Part 139 (Aerodromes) Manual of Standards 2019",
+      "role": "Precision runway touchdown-zone geometry to 900 m for LDA >= 2400 m",
+      "url": "https://www.legislation.gov.au/F2019L01146/latest/text"
+    },
+    {
+      "authority": "Federal Aviation Administration",
+      "title": "Aeronautical Information Manual — Instrument Landing System",
+      "role": "Standard ILS glide path beam approximately 1.4 degrees wide vertically",
+      "url": "https://www.faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html"
+    }
+  ]
+}
