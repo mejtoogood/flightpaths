@@ -2,6 +2,7 @@
   'use strict';
 
   const DATA_URL = './yscb-rwy35-raw/flightpaths.csv';
+  const QNH_URL = './data/yscb-qnh.json';
   const ALT_CUTOFF_FT = 2000 * 3.280839895;
   const RUNWAY_ELEVATION_M = 575;
   const RUNWAY_TRACK_DEG = 359;
@@ -50,7 +51,9 @@
       contrast: 1,
       saturation: 1,
       alpha: 1
-    }
+    },
+    qnhObservations: [],
+    qnhSource: null
   };
 
   const el = id => document.getElementById(id);
@@ -262,9 +265,70 @@
     };
   }
 
+  function qnhForTimestamp(timestamp) {
+    const obs = state.qnhObservations;
+    if (!obs.length) return null;
+
+    let lo = 0;
+    let hi = obs.length - 1;
+    let best = null;
+
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (obs[mid].timestamp <= timestamp) {
+        best = obs[mid];
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+
+    // A METAR altimeter setting remains our best historical setting until
+    // superseded. Guard against accidentally carrying one across a long gap.
+    if (best && timestamp - best.timestamp <= 6 * 60 * 60) return best;
+
+    // Fallback to the nearest report if there was no usable preceding report.
+    const candidates = [obs[Math.max(0, lo - 1)], obs[Math.min(obs.length - 1, lo)]]
+      .filter(Boolean);
+    let nearest = null;
+    let nearestDelta = Infinity;
+    for (const candidate of candidates) {
+      const delta = Math.abs(candidate.timestamp - timestamp);
+      if (delta < nearestDelta) {
+        nearest = candidate;
+        nearestDelta = delta;
+      }
+    }
+    return nearestDelta <= 6 * 60 * 60 ? nearest : null;
+  }
+
+  function pressureAltitudeToQnhFeet(pressureAltitudeFt, qnhHpa) {
+    if (!Number.isFinite(pressureAltitudeFt) || !Number.isFinite(qnhHpa)) {
+      return pressureAltitudeFt;
+    }
+
+    // ICAO standard-atmosphere altimeter equation in the troposphere.
+    const pressureAltitudeM = pressureAltitudeFt * 0.3048;
+    const exponent = 5.25588;
+    const lapseTerm = 2.25577e-5;
+    const pressureHpa =
+      1013.25 * Math.pow(1 - lapseTerm * pressureAltitudeM, exponent);
+    const qnhAltitudeM =
+      (1 - Math.pow(pressureHpa / qnhHpa, 1 / exponent)) / lapseTerm;
+    return qnhAltitudeM / 0.3048;
+  }
+
+  function correctedAltitudeFeet(row) {
+    if (row.altitude <= 0) return RUNWAY_ELEVATION_M / 0.3048;
+    const qnh = qnhForTimestamp(row.timestamp);
+    return qnh ? pressureAltitudeToQnhFeet(row.altitude, qnh.qnhHpa) : row.altitude;
+  }
+
   function displayHeight(row) {
-    const rawM = row.altitude > 0 ? row.altitude * 0.3048 : RUNWAY_ELEVATION_M;
-    return RUNWAY_ELEVATION_M + Math.max(0, rawM - RUNWAY_ELEVATION_M) * state.verticalExaggeration;
+    if (row.altitude <= 0) return RUNWAY_ELEVATION_M;
+    const correctedM = correctedAltitudeFeet(row) * 0.3048;
+    return RUNWAY_ELEVATION_M +
+      Math.max(0, correctedM - RUNWAY_ELEVATION_M) * state.verticalExaggeration;
   }
 
   function positions(rows) {
@@ -277,6 +341,16 @@
 
   function descriptionFor(f) {
     const td = f.touchdown;
+    const finalAirborne = [...f.approach].reverse().find(row => row.altitude > 0);
+    const qnh = qnhForTimestamp(td.timestamp);
+    const correctedFinal = finalAirborne ? correctedAltitudeFeet(finalAirborne) : null;
+    const qnhRows = qnh ? `
+        <tr><th>YSCB QNH</th><td>${qnh.qnhHpa.toFixed(0)} hPa</td></tr>
+        <tr><th>QNH report</th><td>${new Date(qnh.timestamp * 1000).toISOString().replace('T', ' ').slice(0, 16)} UTC</td></tr>` : '';
+    const altitudeRows = finalAirborne ? `
+        <tr><th>Final pressure alt</th><td>${finalAirborne.altitude.toFixed(0)} ft</td></tr>
+        <tr><th>QNH-corrected alt</th><td>${correctedFinal.toFixed(0)} ft</td></tr>` : '';
+
     return `
       <table class="cesium-infoBox-defaultTable"><tbody>
         <tr><th>Flight</th><td>${f.flightNr}</td></tr>
@@ -285,6 +359,8 @@
         <tr><th>Touchdown</th><td>${f.dateText}</td></tr>
         <tr><th>Approach track</th><td>${f.approachTrack.toFixed(1)}°</td></tr>
         <tr><th>Touchdown speed</th><td>${td.speed.toFixed(0)}</td></tr>
+        ${qnhRows}
+        ${altitudeRows}
       </tbody></table>`;
   }
 
@@ -436,11 +512,38 @@
 
   async function loadData() {
     try {
-      el('loadStatus').textContent = 'Downloading flight data…';
-      const response = await fetch(DATA_URL + '?v=6', { cache: 'no-store' });
-      if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+      el('loadStatus').textContent = 'Downloading flight + historical QNH data…';
+      const [response, qnhResponse] = await Promise.all([
+        fetch(DATA_URL + '?v=9', { cache: 'no-store' }),
+        fetch(QNH_URL + '?v=9', { cache: 'no-store' })
+      ]);
+      if (!response.ok) {
+        throw new Error(`Flight CSV HTTP ${response.status} ${response.statusText}`);
+      }
+      if (!qnhResponse.ok) {
+        throw new Error(`QNH data HTTP ${qnhResponse.status} ${qnhResponse.statusText}`);
+      }
 
-      const csvText = await response.text();
+      const [csvText, qnhPayload] = await Promise.all([
+        response.text(),
+        qnhResponse.json()
+      ]);
+      state.qnhObservations = (qnhPayload.observations || [])
+        .map(obs => ({
+          ...obs,
+          timestamp: Number(obs.timestamp),
+          qnhHpa: Number(obs.qnhHpa)
+        }))
+        .filter(obs => Number.isFinite(obs.timestamp) && Number.isFinite(obs.qnhHpa))
+        .sort((a, b) => a.timestamp - b.timestamp);
+      state.qnhSource = qnhPayload.source || 'historical METAR archive';
+
+      if (!state.qnhObservations.length) {
+        throw new Error('Historical QNH file contains no usable observations');
+      }
+
+      el('qnhStatus').textContent =
+        `QNH correction active · ${state.qnhObservations.length} YSCB METAR observations`;
       el('loadStatus').textContent = 'Parsing flight data…';
 
       const results = Papa.parse(csvText, {
@@ -467,7 +570,7 @@
       zoomVisible();
 
       el('loadStatus').textContent =
-        `${captures.length} captures recovered · ${state.flights.length} classified as RWY 35 landings · source cutoff ${ALT_CUTOFF_FT.toFixed(0)} ft (2,000 m)`;
+        `${captures.length} captures recovered · ${state.flights.length} RWY 35 landings · ${state.qnhObservations.length} historical QNH reports loaded · source cutoff ${ALT_CUTOFF_FT.toFixed(0)} ft (2,000 m)`;
 
       const savedToken = localStorage.getItem('cesiumIonToken');
       if (savedToken) {
