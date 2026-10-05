@@ -6,7 +6,7 @@
   <title>YSCB RWY 35 Flight Paths</title>
   <script>window.CESIUM_BASE_URL='https://cdn.jsdelivr.net/npm/cesium@1.145.0/Build/Cesium/';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.145.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="stylesheet" href="styles.css?v=9">
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.145.0/Build/Cesium/Cesium.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.7.0/papaparse.min.js"></script>
 </head>
@@ -77,6 +77,7 @@
       <section>
         <label for="exaggeration">Vertical exaggeration <span id="exaggerationValue">1×</span></label>
         <input id="exaggeration" type="range" min="1" max="5" step="0.5" value="1">
+        <div id="qnhStatus" class="status">Historical QNH correction loading…</div>
       </section>
 
       <section class="buttons">
@@ -95,6 +96,6 @@
       <footer id="loadStatus">Loading flight data…</footer>
     </aside>
   </main>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
