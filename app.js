@@ -31,7 +31,7 @@
     terrainProvider: new Cesium.EllipsoidTerrainProvider()
   });
 
-  viewer.imageryLayers.addImageryProvider(new Cesium.OpenStreetMapImageryProvider({
+  const initialBaseLayer = viewer.imageryLayers.addImageryProvider(new Cesium.OpenStreetMapImageryProvider({
     url: 'https://tile.openstreetmap.org/'
   }));
   viewer.scene.globe.depthTestAgainstTerrain = true;
@@ -42,10 +42,113 @@
     entities: [],
     equipmentEnabled: new Map(),
     selectedFlight: 'all',
-    verticalExaggeration: 1
+    verticalExaggeration: 1,
+    baseLayer: initialBaseLayer,
+    basemap: 'osm',
+    imagery: {
+      brightness: 1,
+      contrast: 1,
+      saturation: 1,
+      alpha: 1
+    }
   };
 
   const el = id => document.getElementById(id);
+
+  function ionToken() {
+    return String(el('ionToken')?.value || localStorage.getItem('cesiumIonToken') || '').trim();
+  }
+
+  function applyImagerySettings() {
+    if (!state.baseLayer) return;
+    state.baseLayer.brightness = state.imagery.brightness;
+    state.baseLayer.contrast = state.imagery.contrast;
+    state.baseLayer.saturation = state.imagery.saturation;
+    state.baseLayer.alpha = state.imagery.alpha;
+    viewer.scene.requestRender();
+  }
+
+  function replaceBaseLayer(layer, mode, label) {
+    const oldLayer = state.baseLayer;
+    viewer.imageryLayers.add(layer, 0);
+    state.baseLayer = layer;
+    state.basemap = mode;
+    applyImagerySettings();
+    if (oldLayer) viewer.imageryLayers.remove(oldLayer, true);
+    localStorage.setItem('flightpathsBasemap', mode);
+    el('basemapSelect').value = mode;
+    el('basemapStatus').textContent = label;
+  }
+
+  async function setBasemap(mode) {
+    const status = el('basemapStatus');
+    const previous = state.basemap;
+    status.textContent = 'Loading basemap…';
+
+    try {
+      let layer;
+      let label;
+
+      if (mode === 'osm') {
+        layer = new Cesium.ImageryLayer(new Cesium.OpenStreetMapImageryProvider({
+          url: 'https://tile.openstreetmap.org/'
+        }));
+        label = 'OpenStreetMap';
+      } else if (mode === 'hillshade') {
+        const provider = await Cesium.ArcGisMapServerImageryProvider.fromUrl(
+          'https://services.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer'
+        );
+        layer = new Cesium.ImageryLayer(provider);
+        label = 'ArcGIS World Hillshade';
+      } else {
+        const token = ionToken();
+        if (!token) {
+          throw new Error('Satellite and road basemaps require a Cesium ion public token.');
+        }
+        Cesium.Ion.defaultAccessToken = token;
+
+        const styles = {
+          'satellite-labels': Cesium.IonWorldImageryStyle.AERIAL_WITH_LABELS,
+          satellite: Cesium.IonWorldImageryStyle.AERIAL,
+          road: Cesium.IonWorldImageryStyle.ROAD
+        };
+        layer = Cesium.ImageryLayer.fromWorldImagery({ style: styles[mode] });
+        label = mode === 'satellite-labels' ? 'Satellite + labels'
+          : mode === 'satellite' ? 'Satellite'
+          : 'Road';
+      }
+
+      replaceBaseLayer(layer, mode, label);
+    } catch (err) {
+      console.error(err);
+      el('basemapSelect').value = previous;
+      status.textContent = `Basemap failed: ${err.message || err}`;
+    }
+  }
+
+  function updateImageryControl(id, key, valueId) {
+    const control = el(id);
+    control.addEventListener('input', event => {
+      state.imagery[key] = Number(event.target.value);
+      el(valueId).textContent = state.imagery[key].toFixed(2);
+      applyImagerySettings();
+    });
+  }
+
+  function resetMapAppearance() {
+    state.imagery = { brightness: 1, contrast: 1, saturation: 1, alpha: 1 };
+    const values = [
+      ['mapBrightness', 'mapBrightnessValue', 1],
+      ['mapContrast', 'mapContrastValue', 1],
+      ['mapSaturation', 'mapSaturationValue', 1],
+      ['mapOpacity', 'mapOpacityValue', 1]
+    ];
+    for (const [controlId, valueId, value] of values) {
+      el(controlId).value = value;
+      el(valueId).textContent = Number(value).toFixed(2);
+    }
+    applyImagerySettings();
+  }
 
   function angularDiff(a, b) {
     return Math.abs(((Number(a) - Number(b) + 180) % 360 + 360) % 360 - 180);
@@ -275,6 +378,13 @@
 
     for (const id of ['showApproach', 'showRollout', 'showTouchdown']) el(id).addEventListener('change', applyFilters);
 
+    el('basemapSelect').addEventListener('change', event => setBasemap(event.target.value));
+    updateImageryControl('mapBrightness', 'brightness', 'mapBrightnessValue');
+    updateImageryControl('mapContrast', 'contrast', 'mapContrastValue');
+    updateImageryControl('mapSaturation', 'saturation', 'mapSaturationValue');
+    updateImageryControl('mapOpacity', 'alpha', 'mapOpacityValue');
+    el('resetMapAppearance').addEventListener('click', resetMapAppearance);
+
     el('exaggeration').addEventListener('input', event => {
       state.verticalExaggeration = Number(event.target.value);
       el('exaggerationValue').textContent = `${state.verticalExaggeration}×`;
@@ -362,6 +472,14 @@
       const savedToken = localStorage.getItem('cesiumIonToken');
       if (savedToken) {
         el('ionToken').value = savedToken;
+      }
+
+      const savedBasemap = localStorage.getItem('flightpathsBasemap') || 'osm';
+      if (savedBasemap !== 'osm') {
+        await setBasemap(savedBasemap);
+      }
+
+      if (savedToken) {
         enableTerrain(savedToken);
       }
     } catch (err) {
