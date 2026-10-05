@@ -34,3 +34,17 @@ footer { margin-top: 13px; padding-top: 10px; border-top: 1px solid rgba(255,255
   #panel { top: 8px; left: 8px; right: 8px; width: auto; max-height: 47%; padding: 12px; }
   h1 { font-size: 18px; }
 }
+.map-adjustments { margin-top: 15px; }
+.map-adjustments .range-control { margin-top: 10px; }
+.map-adjustments .range-control label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 3px;
+  font-weight: 500;
+}
+.map-adjustments .range-control label span {
+  color: #9ca8b4;
+  font-variant-numeric: tabular-nums;
+}
+.map-adjustments button { margin-top: 9px; }
