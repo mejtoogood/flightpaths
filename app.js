@@ -317,39 +317,50 @@
     }
   }
 
-  function loadData() {
-    Papa.parse(DATA_URL, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: results => {
-        try {
-          const rows = results.data.map(normalizeRow).filter(r => Number.isFinite(r.timestamp) && Number.isFinite(r.lat) && Number.isFinite(r.lon));
-          const captures = segmentCaptures(rows);
-          state.flights = captures.map((c, i) => classifyCapture(c, i + 1)).filter(Boolean);
+  async function loadData() {
+    try {
+      el('loadStatus').textContent = 'Downloading flight data…';
+      const response = await fetch(DATA_URL + '?v=6', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
 
-          for (const f of state.flights) addFlightEntities(f);
-          populateControls();
-          applyFilters();
-          zoomVisible();
+      const csvText = await response.text();
+      el('loadStatus').textContent = 'Parsing flight data…';
 
-          el('loadStatus').textContent = `${captures.length} captures recovered · ${state.flights.length} classified as RWY 35 landings · source cutoff ${ALT_CUTOFF_FT.toFixed(0)} ft (2,000 m)`;
+      const results = Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true
+      });
 
-          const savedToken = localStorage.getItem('cesiumIonToken');
-          if (savedToken) {
-            el('ionToken').value = savedToken;
-            enableTerrain(savedToken);
-          }
-        } catch (err) {
-          console.error(err);
-          el('loadStatus').textContent = `Data processing failed: ${err.message}`;
-        }
-      },
-      error: err => {
-        console.error(err);
-        el('loadStatus').textContent = `Could not load ${DATA_URL}: ${err.message || err}`;
+      if (results.errors && results.errors.length) {
+        console.warn('CSV parse warnings:', results.errors.slice(0, 10));
       }
-    });
+
+      const rows = results.data.map(normalizeRow).filter(r =>
+        Number.isFinite(r.timestamp) &&
+        Number.isFinite(r.lat) &&
+        Number.isFinite(r.lon)
+      );
+
+      const captures = segmentCaptures(rows);
+      state.flights = captures.map((c, i) => classifyCapture(c, i + 1)).filter(Boolean);
+
+      for (const f of state.flights) addFlightEntities(f);
+      populateControls();
+      applyFilters();
+      zoomVisible();
+
+      el('loadStatus').textContent =
+        `${captures.length} captures recovered · ${state.flights.length} classified as RWY 35 landings · source cutoff ${ALT_CUTOFF_FT.toFixed(0)} ft (2,000 m)`;
+
+      const savedToken = localStorage.getItem('cesiumIonToken');
+      if (savedToken) {
+        el('ionToken').value = savedToken;
+        enableTerrain(savedToken);
+      }
+    } catch (err) {
+      console.error(err);
+      el('loadStatus').textContent = `Flight data load failed: ${err.message || err}`;
+    }
   }
 
   loadData();
