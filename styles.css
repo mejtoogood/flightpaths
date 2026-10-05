@@ -48,3 +48,39 @@ footer { margin-top: 13px; padding-top: 10px; border-top: 1px solid rgba(255,255
   font-variant-numeric: tabular-nums;
 }
 .map-adjustments button { margin-top: 9px; }
+
+.stacked-label { margin-top: 10px; }
+#aviationPanel .aviation-checks { margin-top: 10px; }
+.marker-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-weight: 600;
+}
+.marker-controls {
+  display: grid;
+  grid-template-columns: 1fr 92px;
+  gap: 8px;
+  align-items: center;
+}
+.marker-controls input[type="number"] {
+  width: 100%;
+  min-height: 34px;
+  box-sizing: border-box;
+  border: 1px solid #3b4652;
+  border-radius: 6px;
+  background: #1a2028;
+  color: #f0f3f5;
+  padding: 6px 7px;
+}
+.unit-hint {
+  margin-top: 4px;
+  color: #83909c;
+  font-size: 10px;
+  line-height: 1.3;
+}
+select:disabled, input:disabled, button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
