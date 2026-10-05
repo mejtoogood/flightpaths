@@ -10,6 +10,24 @@
   let aviation = null;
   let googleTileset = null;
   let overlayOpacity = 0.75;
+
+  const glideDefaults = {
+    color: '#80cbc4',
+    lineWidth: 5,
+    glow: 0.30,
+    visualWidthM: 120,
+    fillOpacity: 0.35,
+    markerSize: 12,
+    labelSize: 14
+  };
+
+  let glideAppearance = { ...glideDefaults };
+  try {
+    const saved = JSON.parse(localStorage.getItem('flightpathsGlideAppearance') || '{}');
+    glideAppearance = { ...glideAppearance, ...saved };
+  } catch (err) {
+    console.warn('Could not restore glidepath appearance', err);
+  }
   const groups = {
     runway: [],
     touchdownZone: [],
@@ -52,6 +70,22 @@
     return Cesium.Color.fromCssColorString(css).withAlpha(alpha * overlayOpacity);
   }
 
+  function glideColour(alpha = 1) {
+    return Cesium.Color.fromCssColorString(glideAppearance.color).withAlpha(alpha);
+  }
+
+  function saveGlideAppearance() {
+    localStorage.setItem('flightpathsGlideAppearance', JSON.stringify(glideAppearance));
+  }
+
+  function glideLineMaterial() {
+    if (glideAppearance.glow <= 0) return glideColour(1);
+    return new Cesium.PolylineGlowMaterialProperty({
+      color: glideColour(1),
+      glowPower: glideAppearance.glow
+    });
+  }
+
   function geodesicPoint(startCoord, endCoord, metres) {
     const start = Cesium.Cartographic.fromDegrees(startCoord[0], startCoord[1]);
     const end = Cesium.Cartographic.fromDegrees(endCoord[0], endCoord[1]);
@@ -83,8 +117,8 @@
       const nominalAboveM = Math.tan(Cesium.Math.toRadians(gp.angleDeg)) * d;
       const lowerAboveM = Math.tan(Cesium.Math.toRadians(gp.angleDeg - gp.beamHalfWidthDeg)) * d;
       const upperAboveM = Math.tan(Cesium.Math.toRadians(gp.angleDeg + gp.beamHalfWidthDeg)) * d;
-      const left = offsetPoint(center, aviation.runway35.trueBearingDeg - 90, gp.visualWidthM / 2);
-      const right = offsetPoint(center, aviation.runway35.trueBearingDeg + 90, gp.visualWidthM / 2);
+      const left = offsetPoint(center, aviation.runway35.trueBearingDeg - 90, glideAppearance.visualWidthM / 2);
+      const right = offsetPoint(center, aviation.runway35.trueBearingDeg + 90, glideAppearance.visualWidthM / 2);
       samples.push({ d, center, left, right, nominalAboveM, lowerAboveM, upperAboveM });
     }
     if (samples.at(-1).d !== gp.rangeM) {
@@ -93,21 +127,21 @@
       const nominalAboveM = Math.tan(Cesium.Math.toRadians(gp.angleDeg)) * d;
       const lowerAboveM = Math.tan(Cesium.Math.toRadians(gp.angleDeg - gp.beamHalfWidthDeg)) * d;
       const upperAboveM = Math.tan(Cesium.Math.toRadians(gp.angleDeg + gp.beamHalfWidthDeg)) * d;
-      const left = offsetPoint(center, aviation.runway35.trueBearingDeg - 90, gp.visualWidthM / 2);
-      const right = offsetPoint(center, aviation.runway35.trueBearingDeg + 90, gp.visualWidthM / 2);
+      const left = offsetPoint(center, aviation.runway35.trueBearingDeg - 90, glideAppearance.visualWidthM / 2);
+      const right = offsetPoint(center, aviation.runway35.trueBearingDeg + 90, glideAppearance.visualWidthM / 2);
       samples.push({ d, center, left, right, nominalAboveM, lowerAboveM, upperAboveM });
     }
     return samples;
   }
 
-  function polygonEntity(id, coords, heights, css, alpha) {
+  function polygonEntity(id, coords, heights, css, alpha, glide = false) {
     const positions = coords.map((coord, i) => Cesium.Cartesian3.fromDegrees(coord[0], coord[1], heights[i]));
     return viewer.entities.add({
       id,
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(positions),
         perPositionHeight: true,
-        material: colour(css, alpha),
+        material: glide ? glideColour(alpha) : colour(css, alpha),
         outline: false
       }
     });
@@ -154,15 +188,22 @@
       name: 'RWY 35 nominal 3° glidepath',
       polyline: {
         positions: samples.map(s => cartesian(s.center, s.nominalAboveM)),
-        width: 3,
-        material: colour('#80cbc4', 1),
+        width: glideAppearance.lineWidth,
+        material: glideLineMaterial(),
         arcType: Cesium.ArcType.NONE
       }
     }));
 
     const ribbonCoords = [...samples.map(s => s.left), ...[...samples].reverse().map(s => s.right)];
     const ribbonHeights = [...samples.map(s => renderHeightFromAboveThreshold(s.nominalAboveM)), ...[...samples].reverse().map(s => renderHeightFromAboveThreshold(s.nominalAboveM))];
-    groups.glideRibbon.push(polygonEntity('aviation-glidepath-ribbon', ribbonCoords, ribbonHeights, '#80cbc4', 0.25));
+    groups.glideRibbon.push(polygonEntity(
+      'aviation-glidepath-ribbon',
+      ribbonCoords,
+      ribbonHeights,
+      glideAppearance.color,
+      glideAppearance.fillOpacity,
+      true
+    ));
 
     const lowerCoords = [...samples.map(s => s.left), ...[...samples].reverse().map(s => s.right)];
     const lowerHeights = [...samples.map(s => renderHeightFromAboveThreshold(s.lowerAboveM)), ...[...samples].reverse().map(s => renderHeightFromAboveThreshold(s.lowerAboveM))];
@@ -179,7 +220,14 @@
       ['aviation-gp-corridor-left', sideLeftCoords, sideLeftHeights],
       ['aviation-gp-corridor-right', sideRightCoords, sideRightHeights]
     ]) {
-      groups.glideCorridor.push(polygonEntity(id, coords, heights, '#9575cd', 0.14));
+      groups.glideCorridor.push(polygonEntity(
+        id,
+        coords,
+        heights,
+        glideAppearance.color,
+        glideAppearance.fillOpacity * 0.65,
+        true
+      ));
     }
 
     const marker = viewer.entities.add({
@@ -187,7 +235,7 @@
       name: 'Glidepath marker',
       position: Cesium.Cartesian3.ZERO,
       point: {
-        pixelSize: 10,
+        pixelSize: glideAppearance.markerSize,
         color: Cesium.Color.fromCssColorString('#ffca28'),
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 1,
@@ -195,7 +243,7 @@
       },
       label: {
         text: '',
-        font: '13px sans-serif',
+        font: `${glideAppearance.labelSize}px sans-serif`,
         fillColor: Cesium.Color.WHITE,
         showBackground: true,
         backgroundColor: Cesium.Color.BLACK.withAlpha(0.72),
@@ -264,7 +312,7 @@
 
     const glideShow = el('showGlidepath').checked;
     const style = el('glidepathStyle').value;
-    setGroupShow('glideLine', glideShow && style === 'line');
+    setGroupShow('glideLine', glideShow);
     setGroupShow('glideRibbon', glideShow && style === 'ribbon');
     setGroupShow('glideCorridor', glideShow && style === 'corridor');
     setGroupShow('marker', el('showGlideMarker').checked);
@@ -339,12 +387,56 @@
     }
   }
 
+  function syncGlideAppearanceControls() {
+    const controls = [
+      ['glideColor', glideAppearance.color],
+      ['glideLineWidth', glideAppearance.lineWidth],
+      ['glideGlow', glideAppearance.glow],
+      ['glideVisualWidth', glideAppearance.visualWidthM],
+      ['glideFillOpacity', glideAppearance.fillOpacity],
+      ['glideMarkerSize', glideAppearance.markerSize],
+      ['glideLabelSize', glideAppearance.labelSize]
+    ];
+    for (const [id, value] of controls) el(id).value = String(value);
+    el('glideLineWidthValue').textContent = `${Number(glideAppearance.lineWidth).toFixed(1)} px`;
+    el('glideGlowValue').textContent = Number(glideAppearance.glow).toFixed(2);
+    el('glideVisualWidthValue').textContent = `${Math.round(glideAppearance.visualWidthM)} m`;
+    el('glideFillOpacityValue').textContent = Number(glideAppearance.fillOpacity).toFixed(2);
+    el('glideMarkerSizeValue').textContent = `${Math.round(glideAppearance.markerSize)} px`;
+    el('glideLabelSizeValue').textContent = `${Math.round(glideAppearance.labelSize)} px`;
+  }
+
+  function setGlideAppearance(key, value) {
+    glideAppearance[key] = value;
+    saveGlideAppearance();
+    syncGlideAppearanceControls();
+    rebuildOverlays();
+  }
+
+  function resetGlideAppearance() {
+    glideAppearance = { ...glideDefaults };
+    saveGlideAppearance();
+    syncGlideAppearanceControls();
+    rebuildOverlays();
+  }
+
   function wireControls() {
+    syncGlideAppearanceControls();
+
     el('sceneSelect').addEventListener('change', e => setSceneMode(e.target.value));
     for (const id of ['showRunwayOutline','showTouchdownZone','showGlidepath','showGlideMarker']) {
       el(id).addEventListener('change', applyOverlayVisibility);
     }
     el('glidepathStyle').addEventListener('change', applyOverlayVisibility);
+
+    el('glideColor').addEventListener('input', e => setGlideAppearance('color', e.target.value));
+    el('glideLineWidth').addEventListener('input', e => setGlideAppearance('lineWidth', Number(e.target.value)));
+    el('glideGlow').addEventListener('input', e => setGlideAppearance('glow', Number(e.target.value)));
+    el('glideVisualWidth').addEventListener('input', e => setGlideAppearance('visualWidthM', Number(e.target.value)));
+    el('glideFillOpacity').addEventListener('input', e => setGlideAppearance('fillOpacity', Number(e.target.value)));
+    el('glideMarkerSize').addEventListener('input', e => setGlideAppearance('markerSize', Number(e.target.value)));
+    el('glideLabelSize').addEventListener('input', e => setGlideAppearance('labelSize', Number(e.target.value)));
+    el('resetGlideAppearance').addEventListener('click', resetGlideAppearance);
 
     const markerChanged = value => updateGlideMarker(Math.round(Math.min(10000, Math.max(0, Number(value) || 0))));
     el('glideMarkerRange').addEventListener('input', e => markerChanged(e.target.value));
@@ -361,7 +453,7 @@
 
   async function loadAviation() {
     try {
-      const response = await fetch(AVIATION_URL + '?v=10', { cache: 'no-store' });
+      const response = await fetch(AVIATION_URL + '?v=11', { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
       aviation = await response.json();
       state.aviation = aviation;
