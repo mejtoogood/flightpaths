@@ -19,8 +19,8 @@
     "measuredThresholdToFarEndM": 2682.739,
     "outline": [
       [
-        149.194197021,
-        -35.314808352
+        149.194197626,
+        -35.320216369
       ],
       [
         149.194194317,
@@ -31,8 +31,8 @@
         -35.290627758
       ],
       [
-        149.194691868,
-        -35.314808314
+        149.194692506,
+        -35.320216331
       ]
     ],
     "touchdownZone": {
@@ -56,6 +56,12 @@
           -35.314808314
         ]
       ]
+    },
+    "physicalLengthM": 3283,
+    "physicalSouthEnd": {
+      "lat": -35.32021635,
+      "lon": 149.194445066,
+      "derivation": "600 m reciprocal extension from RWY 35 threshold; 3283 m physical runway length minus 2683 m RWY 35 LDA"
     }
   },
   "glidepath": {
@@ -87,7 +93,7 @@
     {
       "authority": "Airservices Australia",
       "title": "YSCB Aerodrome Chart SCBAD01-188",
-      "role": "RWY width 45 m, RWY 35 LDA 2683 m, THR elevation 1869 ft",
+      "role": "RWY 17/35 physical dimensions 3283 m × 45 m, RWY 35 LDA 2683 m, THR elevation 1869 ft",
       "url": "https://www.airservicesaustralia.com/aip/pending/dap/SCBAD01-188_03SEP2026.pdf"
     },
     {
