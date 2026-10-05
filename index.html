@@ -6,7 +6,7 @@
   <title>YSCB RWY 35 Flight Paths</title>
   <script>window.CESIUM_BASE_URL='https://cdn.jsdelivr.net/npm/cesium@1.145.0/Build/Cesium/';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.145.0/Build/Cesium/Widgets/widgets.css">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.145.0/Build/Cesium/Cesium.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.7.0/papaparse.min.js"></script>
 </head>
@@ -34,6 +34,40 @@
         <div id="equipmentFilters" class="checks"></div>
       </section>
 
+      <section>
+        <div class="section-title">Map</div>
+        <label for="basemapSelect">Basemap</label>
+        <select id="basemapSelect">
+          <option value="osm">OpenStreetMap</option>
+          <option value="satellite-labels">Satellite + labels</option>
+          <option value="satellite">Satellite</option>
+          <option value="road">Road</option>
+          <option value="hillshade">Hillshade</option>
+        </select>
+        <div id="basemapStatus" class="status">OpenStreetMap</div>
+      </section>
+
+      <details class="map-adjustments" open>
+        <summary>Map appearance</summary>
+        <div class="range-control">
+          <label for="mapBrightness">Brightness <span id="mapBrightnessValue">1.00</span></label>
+          <input id="mapBrightness" type="range" min="0.2" max="2" step="0.05" value="1">
+        </div>
+        <div class="range-control">
+          <label for="mapContrast">Contrast <span id="mapContrastValue">1.00</span></label>
+          <input id="mapContrast" type="range" min="0.2" max="2" step="0.05" value="1">
+        </div>
+        <div class="range-control">
+          <label for="mapSaturation">Saturation <span id="mapSaturationValue">1.00</span></label>
+          <input id="mapSaturation" type="range" min="0" max="2" step="0.05" value="1">
+        </div>
+        <div class="range-control">
+          <label for="mapOpacity">Opacity <span id="mapOpacityValue">1.00</span></label>
+          <input id="mapOpacity" type="range" min="0" max="1" step="0.05" value="1">
+        </div>
+        <button id="resetMapAppearance" type="button">Reset appearance</button>
+      </details>
+
       <section class="checks">
         <label><input id="showApproach" type="checkbox" checked> Approach</label>
         <label><input id="showRollout" type="checkbox" checked> Rollout</label>
@@ -51,8 +85,8 @@
       </section>
 
       <details>
-        <summary>3D terrain</summary>
-        <p>Optional Cesium ion public token. It stays in this browser and is not committed to GitHub.</p>
+        <summary>Cesium ion / 3D terrain</summary>
+        <p>A public Cesium ion token unlocks satellite/road basemaps and World Terrain. It stays in this browser and is not committed to GitHub.</p>
         <input id="ionToken" type="password" autocomplete="off" placeholder="Cesium ion token">
         <button id="terrainBtn" type="button">Enable world terrain</button>
         <div id="terrainStatus" class="status">Ellipsoid terrain</div>
@@ -61,6 +95,6 @@
       <footer id="loadStatus">Loading flight data…</footer>
     </aside>
   </main>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
