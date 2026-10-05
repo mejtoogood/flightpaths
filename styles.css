@@ -84,3 +84,44 @@ select:disabled, input:disabled, button:disabled {
   opacity: .48;
   cursor: not-allowed;
 }
+
+#glideAppearancePanel.subdetails {
+  margin-top: 10px;
+  padding: 9px 10px 10px;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 7px;
+  background: rgba(255,255,255,.025);
+}
+#glideAppearancePanel.subdetails > summary {
+  font-size: 11px;
+  color: #c8d2dc;
+}
+#glideAppearancePanel .range-control { margin-top: 10px; }
+#glideAppearancePanel .range-control label {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 3px;
+  font-weight: 500;
+}
+#glideAppearancePanel .range-control label span {
+  color: #9ca8b4;
+  font-variant-numeric: tabular-nums;
+}
+.colour-control {
+  display: grid;
+  grid-template-columns: 1fr 52px;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.colour-control label { margin: 0; font-weight: 500; }
+.colour-control input[type="color"] {
+  width: 52px;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid #3b4652;
+  border-radius: 5px;
+  background: #1a2028;
+}
+#glideAppearancePanel button { margin-top: 10px; }
