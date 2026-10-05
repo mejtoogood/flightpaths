@@ -4,7 +4,7 @@
   const DATA_URL = './yscb-rwy35-raw/flightpaths.csv';
   const QNH_URL = './data/yscb-qnh.json';
   const ALT_CUTOFF_FT = 2000 * 3.280839895;
-  const RUNWAY_ELEVATION_M = 575;
+  const RUNWAY_ELEVATION_M = 1869 * 0.3048;
   const RUNWAY_TRACK_DEG = 359;
   const CAPTURE_GAP_SECONDS = 6 * 60 * 60;
   const APPROACH_TRACK_TOLERANCE = 30;
@@ -53,7 +53,10 @@
       alpha: 1
     },
     qnhObservations: [],
-    qnhSource: null
+    qnhSource: null,
+    thresholdElevationFt: 1869,
+    standardRenderAnchorM: RUNWAY_ELEVATION_M,
+    renderAnchorM: RUNWAY_ELEVATION_M
   };
 
   const el = id => document.getElementById(id);
@@ -319,16 +322,17 @@
   }
 
   function correctedAltitudeFeet(row) {
-    if (row.altitude <= 0) return RUNWAY_ELEVATION_M / 0.3048;
+    if (row.altitude <= 0) return state.thresholdElevationFt;
     const qnh = qnhForTimestamp(row.timestamp);
     return qnh ? pressureAltitudeToQnhFeet(row.altitude, qnh.qnhHpa) : row.altitude;
   }
 
   function displayHeight(row) {
-    if (row.altitude <= 0) return RUNWAY_ELEVATION_M;
+    if (row.altitude <= 0) return state.renderAnchorM;
     const correctedM = correctedAltitudeFeet(row) * 0.3048;
-    return RUNWAY_ELEVATION_M +
-      Math.max(0, correctedM - RUNWAY_ELEVATION_M) * state.verticalExaggeration;
+    const thresholdM = state.thresholdElevationFt * 0.3048;
+    return state.renderAnchorM +
+      Math.max(0, correctedM - thresholdM) * state.verticalExaggeration;
   }
 
   function positions(rows) {
@@ -590,6 +594,16 @@
       el('loadStatus').textContent = `Flight data load failed: ${err.message || err}`;
     }
   }
+
+  window.flightpathsApp = {
+    viewer,
+    state,
+    el,
+    ionToken,
+    rebuildHeights,
+    applyImagerySettings,
+    setBasemap
+  };
 
   loadData();
 })();
