@@ -29,6 +29,9 @@ jobs:
         with:
           enablement: true
 
+      - name: Build historical YSCB QNH data
+        run: python3 scripts/fetch_qnh.py
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
