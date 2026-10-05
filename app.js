@@ -322,7 +322,6 @@
       download: true,
       header: true,
       skipEmptyLines: true,
-      worker: true,
       complete: results => {
         try {
           const rows = results.data.map(normalizeRow).filter(r => Number.isFinite(r.timestamp) && Number.isFinite(r.lat) && Number.isFinite(r.lon));
