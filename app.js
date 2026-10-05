@@ -68,7 +68,14 @@
   }
 
   function normalizeRow(r) {
-    const [lat, lon] = splitPosition(r.Position);
+    let lat = Number(r.Latitude);
+    let lon = Number(r.Longitude);
+
+    // Backwards-compatible fallback for older merged CSVs.
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      [lat, lon] = splitPosition(r.Position);
+    }
+
     return {
       timestamp: Number(r.Timestamp),
       utc: r.UTC,
