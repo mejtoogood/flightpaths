@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101318">
+  <title>YSCB RWY 35 Glidepath Calculator</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #101318;
+      color: #eef2f5;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #101318; }
+    main { width: min(720px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 44px; }
+    a { color: #8bc2ff; }
+    .back { display: inline-block; margin-bottom: 18px; font-size: 14px; text-decoration: none; }
+    .card {
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 12px;
+      background: #171c23;
+      box-shadow: 0 10px 34px rgba(0,0,0,.25);
+      padding: 20px;
+    }
+    h1 { margin: 0; font-size: clamp(23px, 6vw, 34px); line-height: 1.08; }
+    .sub { margin: 8px 0 22px; color: #aeb8c3; font-size: 14px; line-height: 1.45; }
+    label { display: block; margin-bottom: 7px; color: #dbe1e6; font-size: 13px; font-weight: 700; }
+    .input-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    input, button {
+      min-height: 48px;
+      border: 1px solid #3b4652;
+      border-radius: 8px;
+      background: #1e252e;
+      color: #f3f5f7;
+      font: inherit;
+    }
+    input { width: 100%; padding: 9px 12px; font-size: 18px; font-variant-numeric: tabular-nums; }
+    button { padding: 9px 14px; cursor: pointer; font-weight: 700; }
+    button:hover { background: #28323d; }
+    .results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+    .result {
+      min-width: 0;
+      border-radius: 9px;
+      background: #1d242c;
+      padding: 13px;
+    }
+    .result.wide { grid-column: 1 / -1; }
+    .result span { display: block; color: #93a0ac; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    .result strong { display: block; margin-top: 5px; font-size: 20px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .coord-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-top: 5px; }
+    .coord-row strong { margin: 0; }
+    .coord-row button { min-height: 36px; padding: 5px 9px; font-size: 12px; }
+    .invalid { color: #ff9d9d; margin-top: 12px; min-height: 20px; font-size: 13px; }
+    details { margin-top: 16px; border-top: 1px solid rgba(255,255,255,.1); padding-top: 14px; }
+    summary { cursor: pointer; font-weight: 700; font-size: 13px; }
+    details p, details li { color: #aeb8c3; font-size: 12px; line-height: 1.5; }
+    code { color: #dfe8f3; }
+    .meta { margin-top: 18px; color: #7f8b97; font-size: 11px; line-height: 1.45; }
+    @media (max-width: 520px) {
+      main { width: min(100% - 18px, 720px); padding-top: 14px; }
+      .card { padding: 16px; }
+      .results { grid-template-columns: 1fr; }
+      .result.wide { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="./">← Flight paths</a>
+    <section class="card">
+      <h1>YSCB RWY 35 glidepath</h1>
+      <p class="sub">Enter a target height above the RWY 35 threshold. The calculator returns horizontal distance from threshold and the WGS84 point on the extended centreline.</p>
+
+      <label for="height">Height above threshold (m)</label>
+      <div class="input-row">
+        <input id="height" type="number" inputmode="decimal" step="0.1" value="37" autofocus>
+        <button id="reset" type="button">37 m</button>
+      </div>
+
+      <div class="results" aria-live="polite">
+        <div class="result">
+          <span>Threshold distance</span>
+          <strong id="distance">—</strong>
+        </div>
+        <div class="result">
+          <span>Glidepath height</span>
+          <strong id="heightResult">—</strong>
+        </div>
+        <div class="result wide">
+          <span>WGS84 coordinates</span>
+          <div class="coord-row">
+            <strong id="coords">—</strong>
+            <button id="copy" type="button">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="error" class="invalid"></div>
+
+      <details>
+        <summary>Geometry and source values</summary>
+        <p id="geometry">Loading aviation data…</p>
+        <p><code>d = (h − RDH) / tan(glidepath angle)</code></p>
+        <p>Distance is horizontal distance outward from THR 35 along the reciprocal of the runway centreline bearing. Coordinate projection uses the WGS84 ellipsoid.</p>
+      </details>
+
+      <div id="meta" class="meta">Loading current YSCB aviation constants…</div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const WGS84_A = 6378137.0;
+      const WGS84_F = 1 / 298.257223563;
+      const WGS84_B = (1 - WGS84_F) * WGS84_A;
+
+      const heightInput = document.getElementById('height');
+      const distanceEl = document.getElementById('distance');
+      const heightResultEl = document.getElementById('heightResult');
+      const coordsEl = document.getElementById('coords');
+      const errorEl = document.getElementById('error');
+      const geometryEl = document.getElementById('geometry');
+      const metaEl = document.getElementById('meta');
+      let cfg = null;
+      let lastCoords = '';
+
+      const rad = deg => deg * Math.PI / 180;
+      const deg = radians => radians * 180 / Math.PI;
+
+      function vincentyDirect(lat1Deg, lon1Deg, initialBearingDeg, distanceM) {
+        if (distanceM === 0) return { lat: lat1Deg, lon: lon1Deg };
+
+        const alpha1 = rad(initialBearingDeg);
+        const sinAlpha1 = Math.sin(alpha1);
+        const cosAlpha1 = Math.cos(alpha1);
+        const tanU1 = (1 - WGS84_F) * Math.tan(rad(lat1Deg));
+        const cosU1 = 1 / Math.sqrt(1 + tanU1 * tanU1);
+        const sinU1 = tanU1 * cosU1;
+        const sigma1 = Math.atan2(tanU1, cosAlpha1);
+        const sinAlpha = cosU1 * sinAlpha1;
+        const cosSqAlpha = 1 - sinAlpha * sinAlpha;
+        const uSq = cosSqAlpha * (WGS84_A * WGS84_A - WGS84_B * WGS84_B) / (WGS84_B * WGS84_B);
+        const A = 1 + uSq / 16384 * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)));
+        const B = uSq / 1024 * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)));
+
+        let sigma = distanceM / (WGS84_B * A);
+        let sigmaPrev;
+        let cos2SigmaM, sinSigma, cosSigma, deltaSigma;
+
+        do {
+          cos2SigmaM = Math.cos(2 * sigma1 + sigma);
+          sinSigma = Math.sin(sigma);
+          cosSigma = Math.cos(sigma);
+          deltaSigma = B * sinSigma * (
+            cos2SigmaM + B / 4 * (
+              cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM) -
+              B / 6 * cos2SigmaM * (-3 + 4 * sinSigma * sinSigma) * (-3 + 4 * cos2SigmaM * cos2SigmaM)
+            )
+          );
+          sigmaPrev = sigma;
+          sigma = distanceM / (WGS84_B * A) + deltaSigma;
+        } while (Math.abs(sigma - sigmaPrev) > 1e-12);
+
+        const tmp = sinU1 * sinSigma - cosU1 * cosSigma * cosAlpha1;
+        const lat2 = Math.atan2(
+          sinU1 * cosSigma + cosU1 * sinSigma * cosAlpha1,
+          (1 - WGS84_F) * Math.sqrt(sinAlpha * sinAlpha + tmp * tmp)
+        );
+        const lambda = Math.atan2(
+          sinSigma * sinAlpha1,
+          cosU1 * cosSigma - sinU1 * sinSigma * cosAlpha1
+        );
+        const C = WGS84_F / 16 * cosSqAlpha * (4 + WGS84_F * (4 - 3 * cosSqAlpha));
+        const L = lambda - (1 - C) * WGS84_F * sinAlpha * (
+          sigma + C * sinSigma * (
+            cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM * cos2SigmaM)
+          )
+        );
+
+        const lon2 = ((lon1Deg + deg(L) + 540) % 360) - 180;
+        return { lat: deg(lat2), lon: lon2 };
+      }
+
+      function render() {
+        if (!cfg) return;
+        const h = Number(heightInput.value);
+        const rdhM = cfg.glidepath.rdhFt * 0.3048;
+        const angleRad = rad(cfg.glidepath.angleDeg);
+
+        errorEl.textContent = '';
+        if (!Number.isFinite(h)) {
+          distanceEl.textContent = '—';
+          heightResultEl.textContent = '—';
+          coordsEl.textContent = '—';
+          lastCoords = '';
+          return;
+        }
+
+        const d = (h - rdhM) / Math.tan(angleRad);
+        if (d < 0) {
+          errorEl.textContent = 'Height is below the published threshold crossing height (RDH).';
+          distanceEl.textContent = '—';
+          heightResultEl.textContent = h.toFixed(2) + ' m';
+          coordsEl.textContent = '—';
+          lastCoords = '';
+          return;
+        }
+
+        const thr = cfg.runway35.threshold;
+        const approachBearing = (cfg.runway35.trueBearingDeg + 180) % 360;
+        const point = vincentyDirect(thr.lat, thr.lon, approachBearing, d);
+
+        distanceEl.textContent = d.toFixed(1) + ' m';
+        heightResultEl.textContent = h.toFixed(2) + ' m';
+        lastCoords = point.lat.toFixed(8) + ', ' + point.lon.toFixed(8);
+        coordsEl.textContent = lastCoords;
+      }
+
+      async function init() {
+        try {
+          const response = await fetch('./data/yscb-aviation.json', { cache: 'no-store' });
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          cfg = await response.json();
+
+          const thr = cfg.runway35.threshold;
+          const rdhM = cfg.glidepath.rdhFt * 0.3048;
+          const approachBearing = (cfg.runway35.trueBearingDeg + 180) % 360;
+          geometryEl.textContent =
+            'THR 35 ' + thr.lat.toFixed(9) + '°, ' + thr.lon.toFixed(9) +
+            '°; elevation ' + thr.elevationFtAmsl + ' ft AMSL; glidepath ' +
+            cfg.glidepath.angleDeg.toFixed(2) + '°; RDH ' + cfg.glidepath.rdhFt +
+            ' ft (' + rdhM.toFixed(2) + ' m); approach centreline bearing ' +
+            approachBearing.toFixed(6) + '° true.';
+          metaEl.textContent =
+            'YSCB aviation dataset effective ' + cfg.effectiveFrom +
+            ' to ' + cfg.effectiveTo + '.';
+          render();
+        } catch (err) {
+          errorEl.textContent = 'Could not load YSCB aviation data: ' + (err.message || err);
+          metaEl.textContent = '';
+        }
+      }
+
+      heightInput.addEventListener('input', render);
+      document.getElementById('reset').addEventListener('click', () => {
+        heightInput.value = '37';
+        render();
+        heightInput.focus();
+      });
+      document.getElementById('copy').addEventListener('click', async event => {
+        if (!lastCoords) return;
+        try {
+          await navigator.clipboard.writeText(lastCoords);
+          const button = event.currentTarget;
+          const old = button.textContent;
+          button.textContent = 'Copied';
+          setTimeout(() => { button.textContent = old; }, 1000);
+        } catch (_) {}
+      });
+
+      init();
+    })();
+  </script>
+</body>
+</html>
